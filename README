@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Run me to install dependencies.
+#
+
+cpanm <<DEPENDENCIES
+
+Moo
+Net::VNC
+Quantum::Superpositions
+Imager::Search
+
+DEPENDENCIES
