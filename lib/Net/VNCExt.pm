@@ -2,29 +2,37 @@ package Net::VNCExt;
 
 package Net::VNC;
 use strict;
+use Carp;
 
-sub send_pointer_event {
-    my ($self, $button_mask, $x, $y) = @_;
+sub _disable_continuous_updates {
+    my ($self) = @_;
 
+    # http://tigervnc.sourceforge.net/cgi-bin/rfbproto#enablecontinuousupdates
     $self->socket->print(
         pack(
-            'CCnn',
-            5,              # message type
-            $button_mask,   # button-mask
-            $x,             # x-position
-            $y,             # y-position
+            'CCnnnn',
+            150,
+            0,
+            0,
+            0,
+            $self->width,
+            $self->height
         )
     );
+
+    # Consume the "EndOfContinuousUpdates" message
+    $self->socket->read( my $message_type, 1 ) || die 'unexpected end of data';
+    $message_type = unpack( 'C', $message_type );
+    # assert $message_type == 150;
 }
 
 sub _send_update_request {
     my ($self, $x, $y, $w, $h) = @_;
-
     # frame buffer update request
     my $socket = $self->socket;
     my $incremental = $self->_framebuffer ? 1 : 0;
 
-    # $incremental = 0;
+    $incremental = 0;
 
     $socket->print(
         pack(
@@ -39,26 +47,17 @@ sub _send_update_request {
     );
 }
 
-# sub _receive_message {
-#     my $self = shift;
+sub capture {
+    my $self   = shift;
 
-#     my $socket = $self->socket;
-#     $socket->read( my $message_type, 1 ) || die 'unexpected end of data';
-#     $message_type = unpack( 'C', $message_type );
+    $self->_send_update_request();
 
-#     # warn $message_type;
+    while ( ( my $message_type = $self->_receive_message() ) != 0 ) {
+        warn $message_type;
+    }
 
-#  # This result is unused.  It's meaning is different for the different methods
-#     my $result
-#         = !defined $message_type ? die 'bad message type received'
-#         : $message_type == 0     ? $self->_receive_update()
-#         : $message_type == 1     ? $self->_receive_colour_map()
-#         : $message_type == 2     ? $self->_receive_bell()
-#         : $message_type == 3     ? $self->_receive_cut_text()
-#         : undef; #                         die 'unsupported message type received';
-
-#     return $message_type;
-# }
+    return $self->_image_plus_cursor;
+}
 
 # sub _update_cursor_region {
 #     my $self = shift;
@@ -74,41 +73,5 @@ sub _send_update_request {
 #            warn $message_type;
 #     }
 # }
-
-sub mouse_move_to {
-    my ($self, $x, $y) = @_;
-    $self->send_pointer_event(0, $x, $y);
-
-    my $cursordata = $self->_cursordata;
-    if ( !$cursordata ) {
-        $self->_cursordata( $cursordata = {} );
-    }
-    $cursordata->{x} = $x;
-    $cursordata->{y} = $y;
-}
-
-sub mouse_click {
-    my ($self) = @_;
-
-    my $cursordata = $self->_cursordata;
-    if ( !$cursordata ) {
-        $self->_cursordata( $cursordata = { x => 0, y => 0 } );
-    }
-
-    $self->send_pointer_event(1, $cursordata->{x}, $cursordata->{y});
-    $self->send_pointer_event(0, $cursordata->{x}, $cursordata->{y});
-}
-
-sub mouse_right_click {
-    my ($self) = @_;
-
-    my $cursordata = $self->_cursordata;
-    if ( !$cursordata ) {
-        $self->_cursordata( $cursordata = { x => 0, y => 0 } );
-    }
-
-    $self->send_pointer_event(4, $cursordata->{x}, $cursordata->{y});
-    $self->send_pointer_event(0, $cursordata->{x}, $cursordata->{y});
-}
 
 1;
