@@ -5,7 +5,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 
 package VNC::Minechan;
-use Moo;
+use Mouse;
 use Quantum::Superpositions;
 use Imager::Search ();
 use Imager::Search::Image ();
@@ -56,6 +56,8 @@ sub murmur($) {
 
 sub take_screenshot {
     my $self = shift;
+
+    $self->vnc->mouse_move_to(1, 1);
 
     my $file = "out/screen.png";
     my $capture = $self->vnc->capture();
@@ -131,8 +133,6 @@ sub find_on_screen {
 sub inspect_board {
     my $self = shift;
 
-    $self->mouse_move_to(0, 0);
-
     $self->take_screenshot;
 
     $self->game_status("unknown");
@@ -182,7 +182,6 @@ sub inspect_board {
             last;
         }
 
-        $self->mouse_move_to(0, 0);
         $self->take_screenshot;
     }
 
@@ -474,7 +473,7 @@ sub reset {
 }
 
 package main;
-use Net::VNC 0.39;
+use Net::VNC 0.40;
 use Net::VNCExt;
 
 die "Usage: vnc-minechan.pl <vnc-host:port> <password>\n" unless @ARGV;
@@ -496,10 +495,12 @@ my $vncopt = {};
 }
 
 $vnc = Net::VNC->new($vncopt);
-
+$vnc->hide_cursor(1);
 $vnc->depth(24);
 $vnc->login();
-$vnc->hide_cursor(1);
+$vnc->capture;
+
+# $vnc->_disable_continuous_updates;
 
 say "Login to " . $vnc->name . ": " . $vnc->width . "x" . $vnc->height;
 
